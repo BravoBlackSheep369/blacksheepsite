@@ -9,6 +9,11 @@ Mobile:
 
 <img width="300" height="582" alt="image" src="https://github.com/user-attachments/assets/0826112d-c419-448d-aac4-e776360a0f35" />
 
+Link Embeds:
+
+<img width="742" height="266" alt="image" src="https://github.com/user-attachments/assets/c340e889-dbf6-4ca6-8b95-84bb7746376d" />
+
+
 # Table of Contents
 * [Requirements ( os / package manager)](https://github.com/BravoBlackSheep369/blacksheepsite/edit/main/README.md#requirements--os--package-manager)
 * [Initial install (updates / modules / environment variables)](https://github.com/BravoBlackSheep369/blacksheepsite/edit/main/README.md#initial-install-updates--modules--environment-variables)
@@ -103,5 +108,15 @@ The additional idea for when the "changes" feature would have been finished, was
 Another idea is to have the front-end request the roster every once in a while and update the UI so that the user doesn't have to refresh the website in order to get the updated roster.
 
 The Mobile CSS is not the best, it also needs to be edited/fixed. Such as the Hour text in the banner cutting off and the name as well.
+
+The link embed, although it is "working", it's not displaying the correct info, this is what is embeded:
+
+<img width="742" height="266" alt="image" src="https://github.com/user-attachments/assets/0d95b13f-f52e-43cd-a4f7-6ed8ce3a86bb" />
+
+and this is what the current Date Ranges are:
+
+<img width="742" height="266" alt="image" src="https://github.com/user-attachments/assets/58dd3ab8-048f-43a6-a8d1-e698dd6b0100" />
+
+
 
 Currently, the changes features needs fixing or possibly rewritten. The issue lays in saving some troops when the user doesn't exist in the Database, i haven't been able to figure out why it returns "Saved Troop" but when i check the database, the troop isn't in there. The front-end could also use a bit of a clean-up in terms of code modularity. This could be done by creating separate ejs files for the javascript and then inserting it into the HTML for easier readability.
