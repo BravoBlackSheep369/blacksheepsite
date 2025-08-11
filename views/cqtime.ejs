@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CQ Schedule</title>
+    <link rel="stylesheet" href="/stylesheets/cqstylesheet.css?v=1.26">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no">
+    <% if ( nameProvided && filterNotEmpty ) { %>
+        <% var cqShifts = 0;
+            for (const [dateRange, days] of Object.entries(data)) {
+                for (const [day, cqTimes] of Object.entries(days)) {
+                    cqShifts += Object.keys(cqTimes).length;
+                }
+            } %>
+        <meta content="<%= "You have "+cqShifts+" CQ shifts so far!" %>" property="og:title">
+        <% var descOut = ''; 
+            descOut += `You have shift(s), `
+
+            for (const [dateRange, days] of Object.entries(data)) {
+                for (const [day, cqTimes] of Object.entries(days)) {
+                    for (const [cqTime, rooms] of Object.entries(cqTimes)) {
+                        descOut += `${day} ${Object.keys(cqTimes)[0]}, `
+                    }
+                }
+            }
+            %>
+        <meta content="<%= descOut %>" property="og:description">
+        <meta content="CQ Shift From Arias" property="og:site_name">
+
+        <meta content="https://blacksheep.reyarias.net/blacksheep.png" property='og:image'>
+    <% } else if (nameProvided && !filterNotEmpty) { %>
+        <meta content="You are free!" property="og:title">
+        <meta content="You have no CQ shifts!" property="og:description">
+        <meta content="CQ Shift From Arias" property="og:site_name">
+        <meta content="https://blacksheep.reyarias.net/blacksheep.png" property='og:image'>
+    <% } %>
+</head>
+<body>
+    
+
+    <!--<h1>YOU HAVE <span class="have-cq">CQ</span> TODAY</h1>
+    <h3>Your CQ starts in <span class="late-for-cq">5 minutes</span></h3>
+    <sub>These won't update unless refreshed</sub>-->
+    <header class="site-header">
+        
+        <ul id="oncq">
+        </ul>
+        <ul id="nextshift">
+        </ul>
+
+        <ul id="timenow"> </ul>
+        <script>
+            let customTime
+            function setTime(hour, min, seconds) {
+                customTime = {h: hour, m:min, s:seconds};
+            }
+        </script>
+    </header>
+    
+    <ul id="cqList">
+        <span id="schedule-data" style="display:none;">
+            <%= JSON.stringify(data) %>
+        </span>
+
+        <% Object.keys(data).forEach(function(dayRange) { %>
+            <% const dayRangeInChange = changes[dayRange] !== undefined; %>
+            <div class="daterange">
+                <h1 id="<%= dayRange.replace(/ /g, '-') %>"> <%= dayRange %> </h1>
+                <% Object.keys(data[dayRange]).forEach(function(theDay) { %>
+                    <%  
+                        const dayInChange = dayRangeInChange ? changes[dayRange][theDay] !== undefined : false;
+                        const getMilitaryTime = (withSeconds) => {
+                            const options = { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' };
+                            if (withSeconds) {
+                                options["second"] = '2-digit';
+                            }
+                            const formatter = new Intl.DateTimeFormat('en-US', options);
+
+                            // Format the current time in military (24-hour) format
+                            const militaryTime = formatter.format(new Date() );
+                            return militaryTime;
+                        };
+                        const MONTHSTONUM = {
+                            "January": 0,
+                            "February": 1,
+                            "March": 2,
+                            "April": 3,
+                            "May": 4,
+                            "June": 5,
+                            "July": 6,
+                            "August": 7,
+                            "September": 8,
+                            "October": 9,
+                            "November": 10,
+                            "December": 11,
+
+                            "JAN": 0,
+                            "FEB": 1,
+                            "MAR": 2,
+                            "APR": 3,
+                            "MAY": 4,
+                            "JUN": 5,
+                            "JUL": 6,
+                            "AUG": 7,
+                            "SEP": 8,
+                            "OCT": 9,
+                            "NOV": 10,
+                            "DEC": 11
+                        };
+
+                        function extractDates(input) {
+                            // Regular expression to match dates in the format "DD Month"
+                            const dateRegex = /\b(\d*)\s*\-*([A-Za-z]+)\b/g;
+                            let matches;
+                            const results = [];
+
+                            // Use the regex to find all matches in the input string
+                            while ((matches = dateRegex.exec(input)) !== null) {
+                                const day = matches[1]; // Extract the day (e.g., "31")
+                                const month = matches[2]; // Extract the month name (e.g., "May")
+                                results.push({ day, month });
+                            }
+                            return results;
+                        }
+                        const getDatesFromDayRange = (dayRange) => {
+                            let getDates = extractDates(dayRange);
+                            let startDayNum = getDates[0].day;
+                            let startDayMonth = Number(MONTHSTONUM[getDates[0].month]) + 1;
+                            let endDayNum = getDates[1].day;
+                            let endDayMonth = Number(MONTHSTONUM[getDates[1].month]) + 1;
+                            return [startDayNum, startDayMonth, endDayNum, endDayMonth]
+                        }
+                        const getTodaysDate = () => {
+                            let thedate = new Date();
+                            let localeStr = thedate.toLocaleString('en-US', { timeZone: 'America/New_York' })
+                            let testDate = new Date(localeStr);
+                            return testDate;
+                        }
+                        const todayFallsWithinRange = (dayRange) => {
+                            let todaysDate = getTodaysDate();
+                            const [startDayNum, startDayMonth, endDayNum, endDayMonth] = getDatesFromDayRange(dayRange);
+                            if (startDayNum == undefined || startDayMonth == undefined || endDayNum == undefined || endDayMonth == undefined ) {
+                                return false
+                            }
+                            let startDate = new Date(`${todaysDate.getFullYear()}-${startDayMonth}-${startDayNum}`);
+                            let endDate = new Date(`${todaysDate.getFullYear()}-${endDayMonth}-${endDayNum}`);
+                            return todaysDate >= startDate && todaysDate <= endDate;
+                        }
+                        const todayPassedRange = (dayRange) => {
+                            let todaysDate = getTodaysDate();
+                            const [startDayNum, startDayMonth, endDayNum, endDayMonth] = getDatesFromDayRange(dayRange);
+                            if (startDayNum == undefined || startDayMonth == undefined || endDayNum == undefined || endDayMonth == undefined ) {
+                                return false
+                            }
+                            let startDate = new Date(`${todaysDate.getFullYear()}-${startDayMonth}-${startDayNum}`);
+                            let endDate = new Date(`${todaysDate.getFullYear()}-${endDayMonth}-${endDayNum}`);
+                            return todaysDate >= startDate && todaysDate >= endDate;
+                        }
+                        const dayHasPassed = (dayString) => {
+                            const today = getTodaysDate();
+                            const [dayName, dayNum, monthName] = dayString.split(" ");
+                            const parsedDate = new Date(
+                                today.getFullYear(),
+                                Number(MONTHSTONUM[monthName]),
+                                Number(dayNum) // make sure it's a number
+                            );
+                            const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+                            return todayDateOnly > parsedDate;
+                        }
+                        const dayIsToday = (dayString) => {
+                            const today = getTodaysDate();
+                            const [dayName, dayNum, monthName] = dayString.split(" ");
+                            
+                            const parsedDate = new Date(
+                                today.getFullYear(),
+                                Number(MONTHSTONUM[monthName]),
+                                Number(dayNum) // make sure it's a number
+                            );
+                            return (
+                                parsedDate.getFullYear() === today.getFullYear() &&
+                                parsedDate.getMonth() === today.getMonth() &&
+                                parsedDate.getDate() === today.getDate()
+                            );
+                        };
+
+                        
+                        const hasPassedCQ = (theTimeRange) => {
+                            // Extract the end time from the range string
+                            const [start, end] = theTimeRange.split('-'); // e.g. "1800-1900" => end = "1900"
+
+                            // Parse end time into hours and minutes
+                            const endHours = parseInt(end.slice(0, 2), 10);
+                            const endMinutes = parseInt(end.slice(2, 4), 10);
+                            const endTotalMinutes = endHours * 60 + endMinutes;
+
+                            const startHours = parseInt(start.slice(0, 2), 10);
+                            const startMinutes = parseInt(start.slice(2, 4), 10);
+                            // if the time is midnight (0000) then set it to 24
+                            const startTotalMinutes =  startHours * 60 + startMinutes;
+
+                            // Get current time
+                            const [currHour, currMin] = getMilitaryTime().split(':').map(Number);
+                            const currentTotalMinutes = currHour * 60 + currMin;
+
+                            
+                            return currentTotalMinutes > endTotalMinutes && currentTotalMinutes > startTotalMinutes;
+                        }
+                    %>
+                    <% let datePassed = (todayPassedRange(dayRange) || dayHasPassed(theDay)); %>
+                    <div class="date">
+                        <h2 id="<%= dayRange.replace(/ /g, '-')+theDay.replace(/ /g, '-') %>" class=""> <%= theDay %></h2>
+
+                        <% Object.keys(data[dayRange][theDay]).forEach(function(theTime) { %>
+                            <% let shiftTroops = data[dayRange][theDay][theTime]; %>
+                            <% const timeInChange = dayInChange ? changes[dayRange][theDay][theTime] !== undefined : false; %>
+                            <% if(Object.keys(shiftTroops).length == 0) { %>
+                                <% return; %>
+                            <% } %>
+                            <% let hasPassedAlready = datePassed || (todayFallsWithinRange(dayRange) && dayIsToday(theDay) && hasPassedCQ(theTime)); %>
+                            <a href="/#<%= dayRange.replace(/ /g, '-')+theDay.replace(/ /g, '-')+theTime.replace(/ /g, '-') %>">
+                            <li id="<%= dayRange.replace(/ /g, '-')+theDay.replace(/ /g, '-')+theTime.replace(/ /g, '-') %>" >
+                                <!--<p>todayFallsWithinRange("<%= dayRange %>"): <%= todayFallsWithinRange(dayRange) %>, dayIsToday("<%= dayRange %>"):<%= dayIsToday(theDay) %> hasPassedCQ("<%= theTime %>"):<%= hasPassedCQ(theTime) %> </p>-->
+
+                                <span class="<%= (hasPassedAlready ? "hasPassed" : "have-cq") %>" ><%= theTime %>:</span>
+                                
+                                <% Object.keys(shiftTroops).forEach(function(shifteeRow) { %>
+                                    <% shiftTroops[shifteeRow].forEach(function(nameInEach) { %>
+                                        
+                                        <% if ( nameInEach["nameInEach"] !== undefined) { %>
+                                            <p class="<%= (hasPassedAlready ? " hasPassed" : "") %>">Room: <%= nameInEach.roomNum %>: <%= nameInEach["nameInEach"] %> </p>
+                                            <% let changeInRoom = timeInChange ?  changes[dayRange][theDay][theTime][nameInEach.roomNum] : false %>
+                                            <% if (changeInRoom) { %>
+                                                <% if ( Array.isArray( changeInRoom ) ) {  %>
+                                                    <% changeInRoom.forEach(function(changeItem) { %>
+                                                        <% if(changeItem.operation == "" || changeItem.operation == " ") { return; } %>
+                                                        <!-- <p class="change <%= (hasPassedAlready ? " hasPassed" : "") %> <%= changeItem.operation %>" > &#10551 LOOP [<%= changeItem.operation %>] to Database on <%= changeItem.dateAndTime %> </p>-->
+                                                    <% }) %>
+                                                    
+                                                <% } else { %>
+                                                    <% if(changeInRoom.operation == "" || changeInRoom.operation == " ") { return; } %>
+                                                    <!--<p class="change <%= (hasPassedAlready ? " hasPassed" : "") %> <%= changeInRoom.operation %>" > &#10551 LOOP ELSE [<%= changeInRoom.operation %>] to Database on <%= changeInRoom.dateAndTime %> </p>-->
+                                                <% } %>
+                                                
+                                            <% } %>
+                                        <% } else { %>
+                                            <p class="<%= (hasPassedAlready ? " hasPassed" : "") %>">Room: <%= shifteeRow %>: <%= nameInEach %> </p>
+                                            <% let changeInRoom = timeInChange ?  changes[dayRange][theDay][theTime][shifteeRow] : false %>
+                                            <% if (changeInRoom) { %>
+                                                <% if ( Array.isArray( changeInRoom ) ) {  %>
+                                                    <% changeInRoom.forEach(function(changeItem) { %>
+                                                        <% if(changeItem.operation == "" || changeItem.operation == " ") { return; } %>
+                                                        
+                                                        <% if(nameInEach !== changeItem.old && nameInEach !== changeItem.new) { return; } %>
+                                                        <!--<p class="change <%= (hasPassedAlready ? " hasPassed" : "") %> <%= changeItem.operation %>" > &#10551 NOT NAMEEACH [<%= changeItem.operation %>] to Database  [<%= changeItem.old %>] TO [<%= changeItem.new %>] on <%= changeItem.dateAndTime %> </p>-->
+                                                    <% }) %>
+                                                    
+                                                <% } else { %>
+                                                    <% if(changeInRoom.operation == "" || changeInRoom.operation == " ") { return; } %>
+                                                    <% if(nameInEach !== changeInRoom.old && nameInEach !== changeInRoom.new) { return; } %>
+                                                    <!--<p class="change <%= (hasPassedAlready ? " hasPassed" : "") %> <%= changeInRoom.operation %>" > &#10551 NOT NAMEEACH ELSE [<%= changeInRoom.operation %>] to Database FROM [<%= changeInRoom.old %>] TO [<%= changeInRoom.new %>] on <%= changeInRoom.dateAndTime %> </p>-->
+                                                <% } %>
+                                            <% } %>
+                                        <% } %>
+                                    <% }) %>
+                                <% }); %>
+                            </li>
+                            </a>
+                        <% }); %>
+                    </div>
+                <% }); %>
+            </div>
+        <% }); %>
+    </ul>
+    
+    <Script>
+        const intervalInSeconds = 5; 
+        let upcomingSchedule = [];
+        let displayedOnce = false; 
+        const intervalId = setInterval(() => {
+
+            const getMilitaryTime = (withSeconds) => {
+                const options = { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' };
+                if (withSeconds) {
+                    options["second"] = '2-digit';
+                }
+                const formatter = new Intl.DateTimeFormat('en-US', options);
+
+                // Format the current time in military (24-hour) format
+                const militaryTime = formatter.format(new Date() );
+                if ( customTime !==undefined &&  customTime.h !== undefined && customTime.m !== undefined && customTime.s !== undefined  ) {
+                    return customTime.h + ":" + customTime.m + (withSeconds ? ":" + customTime.s : "")
+                }
+                return militaryTime;
+            };
+
+            // Update live time
+            const elemt = document.getElementById("timenow");
+            if (elemt) {
+                elemt.innerHTML = '';
+                const label = document.createElement("li")
+                label.innerHTML = "Time Now:";
+                elemt.appendChild(label)
+                const actualTIme = document.createElement("li")
+                actualTIme.innerHTML = getMilitaryTime(true);
+                elemt.appendChild(actualTIme);
+            }
+
+            // Get schedule data from DOM
+            const dataElem = document.getElementById("schedule-data");
+            const datajson = JSON.parse(dataElem.innerText);
+
+            // Clear and rebuild upcomingSchedule each interval
+            upcomingSchedule = [];
+
+            Object.keys(datajson).forEach((dayRange) => {
+                
+                Object.keys(datajson[dayRange]).forEach((theDay) => {
+                    const getMilitaryTime = (withSeconds) => {
+                        const options = { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' };
+                        if (withSeconds) {
+                            options["second"] = '2-digit';
+                        }
+                        const formatter = new Intl.DateTimeFormat('en-US', options);
+
+                        // Format the current time in military (24-hour) format
+                        const militaryTime = formatter.format(new Date() );
+                        if ( customTime !==undefined && customTime.h !== undefined && customTime.m !== undefined && customTime.s !== undefined  ) {
+                            return customTime.h + ":" + customTime.m + (withSeconds ? ":" + customTime.s : "")
+                        }
+                        return militaryTime;
+                    };
+                    const MONTHSTONUM = {
+                        "January": 0,
+                        "February": 1,
+                        "March": 2,
+                        "April": 3,
+                        "May": 4,
+                        "June": 5,
+                        "July": 6,
+                        "August": 7,
+                        "September": 8,
+                        "October": 9,
+                        "November": 10,
+                        "December": 11,
+
+                        "JAN": 0,
+                        "FEB": 1,
+                        "MAR": 2,
+                        "APR": 3,
+                        "MAY": 4,
+                        "JUN": 5,
+                        "JUL": 6,
+                        "AUG": 7,
+                        "SEP": 8,
+                        "OCT": 9,
+                        "NOV": 10,
+                        "DEC": 11
+                    };
+
+                    function extractDates(input) {
+                        // Regular expression to match dates in the format "DD Month"
+                        const dateRegex = /\b(\d*)\s*\-*([A-Za-z]+)\b/g;
+                        let matches;
+                        const results = [];
+
+                        // Use the regex to find all matches in the input string
+                        while ((matches = dateRegex.exec(input)) !== null) {
+                            const day = matches[1]; // Extract the day (e.g., "31")
+                            const month = matches[2]; // Extract the month name (e.g., "May")
+                            results.push({ day, month });
+                        }
+                        return results;
+                    }
+                    const getDatesFromDayRange = (dayRange) => {
+                        let getDates = extractDates(dayRange);
+                        let startDayNum = getDates[0].day;
+                        let startDayMonth = Number(MONTHSTONUM[getDates[0].month]) + 1;
+                        let endDayNum = getDates[1].day;
+                        let endDayMonth = Number(MONTHSTONUM[getDates[1].month]) + 1;
+                        return [startDayNum, startDayMonth, endDayNum, endDayMonth]
+                    }
+                    const getTodaysDate = () => {
+                        let thedate = new Date();
+                        let localeStr = thedate.toLocaleString('en-US', { timeZone: 'America/New_York' })
+                        let testDate = new Date(localeStr);
+                        return testDate;
+                    }
+                    const todayFallsWithinRange = (dayRange) => {
+                        let todaysDate = getTodaysDate();
+                        const [startDayNum, startDayMonth, endDayNum, endDayMonth] = getDatesFromDayRange(dayRange);
+                        if (startDayNum == undefined || startDayMonth == undefined || endDayNum == undefined || endDayMonth == undefined ) {
+                            return false
+                        }
+                        let startDate = new Date(`${todaysDate.getFullYear()}-${startDayMonth}-${startDayNum}`);
+                        let endDate = new Date(`${todaysDate.getFullYear()}-${endDayMonth}-${endDayNum}`);
+                        return todaysDate >= startDate && todaysDate <= endDate;
+                    }
+                    const todayPassedRange = (dayRange) => {
+                        let todaysDate = getTodaysDate();
+                        const [startDayNum, startDayMonth, endDayNum, endDayMonth] = getDatesFromDayRange(dayRange);
+                        if (startDayNum == undefined || startDayMonth == undefined || endDayNum == undefined || endDayMonth == undefined ) {
+                            return false
+                        }
+                        let startDate = new Date(`${todaysDate.getFullYear()}-${startDayMonth}-${startDayNum}`);
+                        let endDate = new Date(`${todaysDate.getFullYear()}-${endDayMonth}-${endDayNum}`);
+                        return todaysDate >= startDate && todaysDate >= endDate;
+                    }
+                    const dayHasPassed = (dayString) => {
+                        const today = getTodaysDate();
+                        const [dayName, dayNum, monthName] = dayString.split(" ");
+                        const parsedDate = new Date(
+                            today.getFullYear(),
+                            Number(MONTHSTONUM[monthName]),
+                            Number(dayNum) // make sure it's a number
+                        );
+                        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                        
+                        return todayDateOnly > parsedDate;
+                    }
+                    const dayIsToday = (dayString) => {
+                        const today = getTodaysDate();
+                        const [dayName, dayNum, monthName] = dayString.split(" ");
+                        
+                        const parsedDate = new Date(
+                            today.getFullYear(),
+                            Number(MONTHSTONUM[monthName]),
+                            Number(dayNum) // make sure it's a number
+                        );
+                        return (
+                            parsedDate.getFullYear() === today.getFullYear() &&
+                            parsedDate.getMonth() === today.getMonth() &&
+                            parsedDate.getDate() === today.getDate()
+                        );
+                    };
+
+                    
+                    const hasPassedCQ = (theTimeRange) => {
+                        // Extract the end time from the range string
+                        const [start, end] = theTimeRange.split('-'); // e.g. "1800-1900" => end = "1900"
+
+                        // Parse end time into hours and minutes
+                        const endHours = parseInt(end.slice(0, 2), 10);
+                        const endMinutes = parseInt(end.slice(2, 4), 10);
+                        const endTotalMinutes = endHours * 60 + endMinutes;
+
+                        const startHours = parseInt(start.slice(0, 2), 10);
+                        const startMinutes = parseInt(start.slice(2, 4), 10);
+                        // if the time is midnight (0000) then set it to 24
+                        const startTotalMinutes =  startHours * 60 + startMinutes;
+
+                        // Get current time
+                        const [currHour, currMin] = getMilitaryTime().split(':').map(Number);
+                        const currentTotalMinutes = currHour * 60 + currMin;
+
+                        
+                        return currentTotalMinutes > endTotalMinutes && currentTotalMinutes > startTotalMinutes;
+                    }
+                    Object.keys(datajson[dayRange][theDay]).forEach((theTime) => {
+                        const elementId = (
+                            dayRange.replace(/ /g, '-') +
+                            theDay.replace(/ /g, '-') +
+                            theTime.replace(/ /g, '-')
+                        );
+
+                        const elem = document.getElementById(elementId);
+
+                        if (elem) {
+                            const hasPassedClass = elem.classList.contains("hasPassed");
+                            const datePassed = (todayPassedRange(dayRange) || dayHasPassed(theDay)); 
+                            const dateTodayButTimePassed = todayFallsWithinRange(dayRange) && dayIsToday(theDay) && hasPassedCQ(theTime)
+                            const shouldMarkPassed = ( datePassed || dateTodayButTimePassed );
+                            
+                            if (!hasPassedClass && shouldMarkPassed) {
+                                elem.classList.add("hasPassed");
+                                elem.querySelectorAll("span").forEach(spanElem => {
+                                    if ( spanElem.classList.contains("have-cq")) {
+                                        spanElem.classList.remove("have-cq");
+                                    }
+                                })
+                                elem.querySelectorAll("*").forEach(child => {
+                                    child.classList.add("hasPassed"); 
+                                });
+                            } else if (!hasPassedClass && (!dateTodayButTimePassed && !datePassed)) {
+                                upcomingSchedule.push({
+                                    dayRange,
+                                    theDay,
+                                    theTime,
+                                    element: elem
+                                });
+                            } else if (hasPassedClass && !shouldMarkPassed){
+                                elem.classList.remove("hasPassed");
+                                elem.querySelectorAll("span").forEach(spanElem => {
+                                    if ( !spanElem.classList.contains("have-cq")) {
+                                        spanElem.classList.add("have-cq");
+                                    }
+                                })
+                                elem.querySelectorAll("*").forEach(child => {
+                                    child.classList.remove("hasPassed"); 
+                                    
+                                });
+                                
+                            }
+                        }
+                    });
+                });
+            });
+
+            // Do something with the next upcoming shift (if any)
+            if ( displayedOnce !== true){
+                displayedOnce = true;
+                console.log("Upcoming Schedule: ",upcomingSchedule)
+            }
+            if (upcomingSchedule.length > 0) {
+                const onShift = upcomingSchedule[0];
+                const upcoming = upcomingSchedule[1];
+                const currentElem = document.getElementById("oncq");
+                const upcomingElem = document.getElementById("nextshift");
+                if (currentElem && upcomingElem) {
+                    currentElem.innerText = '';
+                    upcomingElem.innerText = '';
+
+                    currentElem.innerHTML = "ON CQ RN: ";
+                    upcomingElem.innerHTML = "Has CQ Next: ";
+                    const currentLI = document.createElement("ul")
+                    currentElem.appendChild(currentLI)
+                    const nextLI = document.createElement("ul")
+                    upcomingElem.appendChild(nextLI)
+                    
+                    const currentShftElem = document.createElement("li");
+                    currentShftElem.href = "/#"+onShift.element.attributes.id;
+                    currentShftElem.innerHTML = onShift.element.innerHTML;
+                    currentLI.appendChild(currentShftElem)
+
+                    const nextShftElem = document.createElement("li");
+                    nextShftElem.href = "/#"+upcoming.element.attributes.id;
+                    nextShftElem.innerHTML = upcoming.element.innerHTML;
+                    nextLI.appendChild(nextShftElem)
+
+                    // let shiftroomnum = datajson[onShift.dayRange][onShift.theDay][onShift.theTime]; 
+
+                    // if(Object.keys(shiftroomnum).length > 1) {
+                    //     Object.keys(shiftroomnum).forEach(function(shifteeRow) {
+                    //         shiftroomnum[shifteeRow].forEach(function(nameInEach) {
+                    //             const roomMemElem = document.createElement("li");
+                    //             roomMemElem.innerHTML = `${shifteeRow}: ${nameInEach}`
+                    //             currentLI.appendChild(roomMemElem)
+                    //         })
+                    //     })
+                    // } 
+                    // let nextroomnum = datajson[upcoming.dayRange][upcoming.theDay][upcoming.theTime]; 
+                    // if(Object.keys(nextroomnum).length > 1) {
+                    //     Object.keys(nextroomnum).forEach(function(shifteeRow) {
+                    //         nextroomnum[shifteeRow].forEach(function(nameInEach) {
+                    //             const roomMemElem = document.createElement("li");
+                    //             roomMemElem.innerHTML = `${shifteeRow}: ${nameInEach}`
+                    //             nextLI.appendChild(roomMemElem)
+                    //         })
+                    //     })
+                    // } 
+                }
+            }
+
+        }, intervalInSeconds * 1000);
+
+    </Script>
+    <link rel="script" href="/public/javascript/appendJson.js"></link>
+    <!--<p><%= JSON.stringify(data) %> </p> -->
+</body>
+</html>
