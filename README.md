@@ -65,7 +65,7 @@ Make sure you edit the `startsite.sh` so the path in that file points to the dir
 
 Then run `sudo systemctl daemon-reload`, then `systemctl enable rostersite && systemctl start rostersite`, of course also replacing `rostersite` with what you called the service earlier. Now that it is started you can `stop`, `start` or `restart` by just replacing "start" with one of those words in this command: `systemctl start rostersite`.
 
-You can also view the console output from the service (like when you do `console.log` in the application) you can run `journalctl -fu startsite --lines 1000`, the `--lines 1000` arguments tells journal you want to see 1000 previously logged log lines this argument is optional so you can ommit it if you dont want to see previous logs. In `-Fu` the `f` means "follow", which is to continously output the logs as they come in. The `u` from `-fu` means the journal from a specific "unit/service", in our case our service in `rostersite`. 
+You can also view the console output from the service (like when you do `console.log` in the application) you can run `journalctl -fu rostersite --lines 1000`, the `--lines 1000` arguments tells journal you want to see 1000 previously logged log lines this argument is optional so you can ommit it if you dont want to see previous logs. In `-Fu` the `f` means "follow", which is to continously output the logs as they come in. The `u` from `-fu` means the journal from a specific "unit/service", in our case our service in `rostersite`. 
 
 # Running Website (in the forground)
 If you dont want to run the site as a service and only keep it up while you have the terminal open then you can run `node ./app.js` and to close it just do `ctrl-c` or close the terminal window.
